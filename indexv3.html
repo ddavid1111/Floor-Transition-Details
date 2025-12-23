@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Transition Details</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #667eea; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 10px; padding: 30px; }
+        h1 { color: #2F5496; text-align: center; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        select { width: 100%; padding: 10px; margin: 10px 0; font-size: 16px; }
+        .results { background: #70AD47; color: white; padding: 20px; border-radius: 10px; margin-top: 20px; display: none; }
+        .results.show { display: block; }
+        .grid { font-size: 48px; font-weight: bold; text-align: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Floor Transition Details</h1>
+        <div id="loading" class="loading">Loading data...</div>
+        <div id="app" style="display:none;">
+            <label>Material 1:</label>
+            <select id="mat1"></select>
+            <label>Material 2:</label>
+            <select id="mat2"></select>
+            <div id="results" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        console.log('=== APP STARTING ===');
+        
+        const SHEET_ID = '1v3zNXysqwsWYd15BCsYjSCG3vD6RzoERe7NWARgCIsE';
+        let materials = [];
+        let pairs = [];
+
+        function loadSheet(name, callback) {
+            return new Promise((resolve, reject) => {
+                const cb = 'cb_' + Date.now();
+                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=${name}`;
+                
+                window[cb] = function(data) {
+                    console.log('Loaded:', name);
+                    callback(data);
+                    delete window[cb];
+                    document.body.removeChild(s);
+                    resolve();
+                };
+                
+                const s = document.createElement('script');
+                s.src = url;
+                s.onerror = () => reject('Failed: ' + name);
+                document.body.appendChild(s);
+            });
+        }
+
+        function parseMaterials(data) {
+            materials = [];
+            data.table.rows.forEach(row => {
+                if (!row.c) return;
+                const id = row.c[0]?.v;
+                const name = row.c[1]?.v;
+                const active = row.c[2]?.v;
+                if (id && name && active?.toString().toLowerCase() === 'yes') {
+                    materials.push({id, name});
+                }
+            });
+            materials.sort((a,b) => a.name.localeCompare(b.name));
+            console.log('Materials:', materials.length);
+        }
+
+        function parsePairs(data) {
+            pairs = [];
+            data.table.rows.forEach((row, i) => {
+                if (i === 0 || !row.c) return;
+                const a_id = row.c[0]?.v;
+                const a_name = row.c[1]?.v;
+                const b_id = row.c[2]?.v;
+                const b_name = row.c[3]?.v;
+                const key = row.c[4]?.v;
+                const grid = row.c[5]?.v;
+                const status = row.c[6]?.v || 'Draft';
+                const notes = row.c[7]?.v || '';
+                const img = row.c[8]?.v || '';
+                
+                if (a_id && b_id && key) {
+                    pairs.push({a_id, a_name, b_id, b_name, key, grid, status, notes, img});
+                }
+            });
+            console.log('Pairs:', pairs.length);
+        }
+
+        function initUI() {
+            const mat1 = document.getElementById('mat1');
+            const mat2 = document.getElementById('mat2');
+            
+            mat1.innerHTML = '<option value="">-- Select Material 1 --</option>';
+            mat2.innerHTML = '<option value="">-- Select Material 2 --</option>';
+            
+            materials.forEach(m => {
+                mat1.add(new Option(m.name, m.id));
+                mat2.add(new Option(m.name, m.id));
+            });
+            
+            mat1.onchange = () => {
+                filterMat2();
+                findPair();
+            };
+            mat2.onchange = findPair;
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+        }
+
+        function filterMat2() {
+            const id1 = document.getElementById('mat1').value;
+            const mat2 = document.getElementById('mat2');
+            const curr = mat2.value;
+            
+            mat2.innerHTML = '<option value="">-- Select Material 2 --</option>';
+            
+            if (!id1) {
+                materials.forEach(m => mat2.add(new Option(m.name, m.id)));
+            } else {
+                const paired = new Set();
+                pairs.forEach(p => {
+                    if (p.a_id === id1) paired.add(p.b_id);
+                    if (p.b_id === id1) paired.add(p.a_id);
+                });
+                materials.forEach(m => {
+                    if (paired.has(m.id)) mat2.add(new Option(m.name, m.id));
+                });
+            }
+            
+            if (curr && Array.from(mat2.options).some(o => o.value === curr)) {
+                mat2.value = curr;
+            }
+        }
+
+        function findPair() {
+            const id1 = document.getElementById('mat1').value;
+            const id2 = document.getElementById('mat2').value;
+            const results = document.getElementById('results');
+            
+            if (!id1 || !id2) {
+                results.classList.remove('show');
+                return;
+            }
+            
+            const key = [id1, id2].sort().join('–');
+            const pair = pairs.find(p => p.key === key);
+            
+            if (pair && pair.grid && pair.grid !== 'Not Assigned') {
+                results.innerHTML = `
+                    <div class="grid">${pair.grid}</div>
+                    <div><strong>Pair:</strong> ${pair.key}</div>
+                    <div><strong>Status:</strong> ${pair.status}</div>
+                    ${pair.notes ? `<div><strong>Notes:</strong> ${pair.notes}</div>` : ''}
+                `;
+                results.classList.add('show');
+            } else {
+                results.innerHTML = '<div>⚠ This pairing has not been assigned yet.</div>';
+                results.classList.add('show');
+            }
+        }
+
+        // Start loading
+        Promise.all([
+            loadSheet('Floor_Materials', parseMaterials),
+            loadSheet('Material_Pairs', parsePairs)
+        ])
+        .then(() => {
+            console.log('=== DATA LOADED ===');
+            initUI();
+        })
+        .catch(err => {
+            console.error('ERROR:', err);
+            document.getElementById('loading').innerHTML = '<div style="color:red;">Error loading data: ' + err + '</div>';
+        });
+    </script>
+</body>
+</html>
