@@ -128,7 +128,6 @@
                 <div class="tab" data-tab="gallery">Gallery View</div>
             </div>
 
-            <!-- Dropdown Mode -->
             <div class="tab-content active" id="dropdown-content">
                 <div class="content-wrapper">
                     <div class="selection-panel">
@@ -156,7 +155,6 @@
                 </div>
             </div>
 
-            <!-- Checkbox Mode -->
             <div class="tab-content" id="checkbox-content">
                 <div class="content-wrapper">
                     <div class="selection-panel">
@@ -182,7 +180,6 @@
                 </div>
             </div>
 
-            <!-- Gallery View -->
             <div class="tab-content" id="gallery-content">
                 <div class="gallery-container">
                     <div class="gallery-filters">
@@ -206,7 +203,6 @@
         </div>
     </div>
 
-    <!-- Modal -->
     <div class="modal" id="detailModal">
         <div class="modal-content">
             <button class="modal-close" onclick="closeModal()">&times;</button>
@@ -281,14 +277,25 @@
             console.log('Pairs:', pairs.length);
         }
 
+        /**
+         * UPDATED: Using the Thumbnail endpoint to bypass 2024 Google Drive security blocks.
+         */
         function getImageUrl(pair) {
             if (pair.img && pair.img !== '') {
-                return `https://drive.google.com/uc?export=view&id=${pair.img}`;
+                // If the user accidentally pasted a full URL instead of just the ID, try to extract ID
+                let fileId = pair.img;
+                if (fileId.includes('id=')) {
+                    fileId = fileId.split('id=')[1].split('&')[0];
+                } else if (fileId.includes('/d/')) {
+                    fileId = fileId.split('/d/')[1].split('/')[0];
+                }
+                
+                // Return high-quality 1000px wide preview thumbnail
+                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
             }
             return null;
         }
 
-        // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 const tabName = tab.dataset.tab;
@@ -299,19 +306,15 @@
             });
         });
 
-        // Dropdown Mode
         function initDropdown() {
             const mat1 = document.getElementById('dropdown-mat1');
             const mat2 = document.getElementById('dropdown-mat2');
-            
             mat1.innerHTML = '<option value="">-- Select Material 1 --</option>';
             mat2.innerHTML = '<option value="">-- Select Material 2 --</option>';
-            
             materials.forEach(m => {
                 mat1.add(new Option(m.name, m.id));
                 mat2.add(new Option(m.name, m.id));
             });
-            
             mat1.onchange = () => { filterDropdownMat2(); updateDropdown(); };
             mat2.onchange = updateDropdown;
         }
@@ -320,9 +323,7 @@
             const id1 = document.getElementById('dropdown-mat1').value;
             const mat2 = document.getElementById('dropdown-mat2');
             const curr = mat2.value;
-            
             mat2.innerHTML = '<option value="">-- Select Material 2 --</option>';
-            
             if (!id1) {
                 materials.forEach(m => mat2.add(new Option(m.name, m.id)));
             } else {
@@ -335,23 +336,19 @@
                     if (paired.has(m.id)) mat2.add(new Option(m.name, m.id));
                 });
             }
-            
             if (curr && Array.from(mat2.options).some(o => o.value === curr)) mat2.value = curr;
         }
 
         function updateDropdown() {
             const id1 = document.getElementById('dropdown-mat1').value;
             const id2 = document.getElementById('dropdown-mat2').value;
-            
             if (!id1 || !id2) {
                 document.getElementById('dropdown-results').classList.remove('show');
                 document.getElementById('dropdown-preview').classList.remove('show');
                 return;
             }
-
             const key = [id1, id2].sort().join('–');
             const pair = pairs.find(p => p.key === key);
-            
             if (pair && pair.grid !== 'Not Assigned') {
                 showResults('dropdown-results', pair);
                 showPreview('dropdown-preview', 'dropdown-preview-image', 'dropdown-preview-info', pair);
@@ -362,11 +359,9 @@
             }
         }
 
-        // Checkbox Mode
         function initCheckbox() {
             const container1 = document.getElementById('checkbox-mat1-container');
             container1.innerHTML = '';
-            
             materials.forEach(m => {
                 const item = document.createElement('div');
                 item.className = 'checkbox-item';
@@ -385,30 +380,24 @@
         function handleCheckboxMat1() {
             const cbs = document.querySelectorAll('input[name="cb-mat1"]');
             let selected = null;
-            
             cbs.forEach(cb => {
                 if (cb.checked && !selected) selected = cb.value;
                 else cb.checked = false;
             });
-            
             const container2 = document.getElementById('checkbox-mat2-container');
             container2.innerHTML = '';
-            
             document.querySelectorAll('input[name="cb-mat2"]').forEach(cb => cb.checked = false);
-            
             if (!selected) {
                 container2.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">Select Material 1 first</p>';
                 document.getElementById('checkbox-results').classList.remove('show');
                 document.getElementById('checkbox-preview').classList.remove('show');
                 return;
             }
-            
             const paired = new Set();
             pairs.forEach(p => {
                 if (p.a_id === selected) paired.add(p.b_id);
                 if (p.b_id === selected) paired.add(p.a_id);
             });
-            
             materials.forEach(m => {
                 if (paired.has(m.id)) {
                     const item = document.createElement('div');
@@ -429,52 +418,41 @@
         function handleCheckboxMat2() {
             const cbs = document.querySelectorAll('input[name="cb-mat2"]');
             let selected = null;
-            
             cbs.forEach(cb => {
                 if (cb.checked && !selected) selected = cb.value;
                 else cb.checked = false;
             });
-            
             if (!selected) {
                 document.getElementById('checkbox-results').classList.remove('show');
                 document.getElementById('checkbox-preview').classList.remove('show');
                 return;
             }
-            
             const id1 = document.querySelector('input[name="cb-mat1"]:checked')?.value;
             if (!id1) return;
-            
             const key = [id1, selected].sort().join('–');
             const pair = pairs.find(p => p.key === key);
-            
             if (pair && pair.grid !== 'Not Assigned') {
                 showResults('checkbox-results', pair);
                 showPreview('checkbox-preview', 'checkbox-preview-image', 'checkbox-preview-info', pair);
             }
         }
 
-        // Gallery View
         function initGallery() {
             const f1 = document.getElementById('gallery-filter-mat1');
             const f2 = document.getElementById('gallery-filter-mat2');
-            
             materials.forEach(m => {
                 f1.add(new Option(m.name, m.id));
                 f2.add(new Option(m.name, m.id));
             });
-            
             f1.onchange = filterGallery;
             f2.onchange = filterGallery;
-            
             renderGallery();
         }
 
         function filterGallery() {
             const id1 = document.getElementById('gallery-filter-mat1').value;
             const id2 = document.getElementById('gallery-filter-mat2').value;
-            
             let filtered = pairs;
-            
             if (id1 && id2) {
                 const key = [id1, id2].sort().join('–');
                 filtered = filtered.filter(p => p.key === key);
@@ -483,7 +461,6 @@
             } else if (id2) {
                 filtered = filtered.filter(p => p.a_id === id2 || p.b_id === id2);
             }
-            
             renderGallery(filtered);
         }
 
@@ -496,19 +473,15 @@
         function renderGallery(pairsToShow = pairs) {
             const grid = document.getElementById('gallery-grid');
             grid.innerHTML = '';
-            
             pairsToShow.forEach(p => {
                 if (p.grid === 'Not Assigned') return;
-                
                 const card = document.createElement('div');
                 card.className = 'gallery-card';
                 card.onclick = () => openModal(p);
-                
                 const imgUrl = getImageUrl(p);
                 const imgHtml = imgUrl 
                     ? `<img src="${imgUrl}" alt="${p.grid}" onerror="this.parentElement.innerHTML='<span class=\\'no-image\\'>No image</span>'">`
                     : '<span class="no-image">No image</span>';
-                
                 card.innerHTML = `
                     <div class="gallery-card-image">${imgHtml}</div>
                     <div class="gallery-card-info">
@@ -517,12 +490,10 @@
                         <div class="gallery-card-status">${p.status}</div>
                     </div>
                 `;
-                
                 grid.appendChild(card);
             });
         }
 
-        // Results & Preview
         function showResults(containerId, pair) {
             const container = document.getElementById(containerId);
             container.innerHTML = `
@@ -553,11 +524,11 @@
             const panel = document.getElementById(panelId);
             const imageContainer = document.getElementById(imageId);
             const info = document.getElementById(infoId);
-            
             const imgUrl = getImageUrl(pair);
-            
             if (imgUrl) {
-                imageContainer.innerHTML = `<img src="${imgUrl}" alt="${pair.grid}" onclick='openModal(${JSON.stringify(pair).replace(/'/g, "&#39;")})' onerror="this.parentElement.innerHTML='<span style=\\'color:#999\\'>Image not available</span>'">`;
+                // Ensure pair object is safe for stringification in the onclick handler
+                const safePair = JSON.stringify(pair).replace(/'/g, "\\'");
+                imageContainer.innerHTML = `<img src="${imgUrl}" alt="${pair.grid}" onclick='openModal(${safePair})' onerror="this.parentElement.innerHTML='<span style=\\'color:#999\\'>Image not available</span>'">`;
                 info.innerHTML = `<div class="preview-grid">${pair.grid}</div><div class="preview-materials">${pair.a_name} + ${pair.b_name}</div>`;
                 panel.classList.add('show');
             } else {
@@ -565,19 +536,15 @@
             }
         }
 
-        // Modal
         function openModal(pair) {
             const modal = document.getElementById('detailModal');
             const img = document.getElementById('modal-image');
             const grid = document.getElementById('modal-grid');
             const info = document.getElementById('modal-info');
-            
             const imgUrl = getImageUrl(pair);
             img.src = imgUrl || '';
             img.style.display = imgUrl ? 'block' : 'none';
-            
             grid.textContent = pair.grid;
-            
             info.innerHTML = `
                 <div class="modal-info-item"><div class="modal-info-label">Material 1</div><div class="modal-info-value">${pair.a_name}</div></div>
                 <div class="modal-info-item"><div class="modal-info-label">Material 2</div><div class="modal-info-value">${pair.b_name}</div></div>
@@ -587,7 +554,6 @@
                 <div class="modal-info-item" style="grid-column:1/-1;"><div class="modal-info-label">Notes</div><div class="modal-info-value" style="font-weight:400;">${pair.notes}</div></div>
                 ` : ''}
             `;
-            
             modal.classList.add('show');
         }
 
@@ -604,7 +570,6 @@
             document.getElementById('lastUpdated').textContent = 'Last loaded: ' + now.toLocaleString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});
         }
 
-        // Start app
         Promise.all([
             loadSheet('Floor_Materials', parseMaterials),
             loadSheet('Material_Pairs', parsePairs)
