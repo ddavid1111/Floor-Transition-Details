@@ -828,20 +828,42 @@
         // Load Google Sheets data
         async function loadGoogleSheetData() {
             try {
+                console.log('=== STARTING DATA LOAD ===');
+                console.log('Sheet ID:', SHEET_ID);
+                
+                console.log('Loading Floor_Materials...');
                 await loadSheet('Floor_Materials', parseMaterialsFromJSON);
+                console.log('✓ Floor_Materials loaded');
+                
+                console.log('Loading Material_Pairs...');
                 await loadSheet('Material_Pairs', parsePairsFromJSON);
+                console.log('✓ Material_Pairs loaded');
+                
+                console.log('=== DATA LOAD COMPLETE ===');
+                console.log('Total materials:', materialData.materials.length);
+                console.log('Total pairs:', materialData.pairs.length);
                 
                 document.getElementById('loadingSection').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
                 
+                console.log('Initializing UI...');
                 initializeDropdownMode();
+                console.log('✓ Dropdown mode initialized');
+                
                 initializeCheckboxMode();
+                console.log('✓ Checkbox mode initialized');
+                
                 initializeGalleryView();
+                console.log('✓ Gallery view initialized');
+                
                 updateLastUpdated();
+                console.log('=== INITIALIZATION COMPLETE ===');
                 
             } catch (error) {
-                console.error('Error loading data:', error);
-                showError('Unable to load data from Google Sheets.');
+                console.error('!!! ERROR LOADING DATA !!!');
+                console.error('Error details:', error);
+                console.error('Error stack:', error.stack);
+                showError('Unable to load data from Google Sheets: ' + error.message);
             }
         }
 
@@ -850,20 +872,31 @@
                 const callbackName = 'handleSheetData_' + Date.now();
                 const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
                 
+                console.log(`  Creating callback: ${callbackName}`);
+                console.log(`  URL: ${url}`);
+                
                 window[callbackName] = function(data) {
+                    console.log(`  ✓ Received data for ${sheetName}`);
+                    console.log(`  Data structure:`, data);
                     try {
                         parseFunction(data);
+                        console.log(`  ✓ Parsed ${sheetName} successfully`);
                         delete window[callbackName];
                         document.body.removeChild(script);
                         resolve();
                     } catch (error) {
+                        console.error(`  !!! Error parsing ${sheetName}:`, error);
                         reject(error);
                     }
                 };
                 
                 const script = document.createElement('script');
                 script.src = url.replace('tqx=out:json', `tqx=out:json;responseHandler:${callbackName}`);
-                script.onerror = () => reject(new Error(`Failed to load ${sheetName}`));
+                script.onerror = () => {
+                    console.error(`  !!! Failed to load script for ${sheetName}`);
+                    reject(new Error(`Failed to load ${sheetName}`));
+                };
+                console.log(`  Adding script tag to page...`);
                 document.body.appendChild(script);
             });
         }
@@ -904,7 +937,8 @@
                 const grid_location = row.c[5] ? row.c[5].v : null;
                 const status = row.c[6] ? row.c[6].v : 'Draft';
                 const notes = row.c[7] ? row.c[7].v : '';
-                const image_file_id = row.c[8] ? row.c[8].v : ''; // NEW: Column I for image file ID
+                // Safely read Column I - handle if it doesn't exist
+                const image_file_id = (row.c[8] && row.c[8].v) ? row.c[8].v.toString().trim() : '';
                 
                 if (mat_a_id && mat_b_id && pair_key) {
                     materialData.pairs.push({
@@ -920,6 +954,9 @@
                     });
                 }
             }
+            
+            console.log('Parsed pairs:', materialData.pairs.length);
+            console.log('Sample pair:', materialData.pairs[0]);
         }
 
         // Tab switching
