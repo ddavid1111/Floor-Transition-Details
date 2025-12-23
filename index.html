@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Transition Details - Live Data</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1200px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2F5496 0%, #1a3a6b 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .live-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-indicator::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #f5f5f5;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: #ececec;
+            color: #333;
+        }
+
+        .tab.active {
+            background: white;
+            color: #2F5496;
+            border-bottom: 3px solid #2F5496;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Loading */
+        .loading {
+            padding: 40px;
+            text-align: center;
+            color: #666;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Main Content Layout */
+        .content-wrapper {
+            display: flex;
+            gap: 20px;
+            padding: 30px;
+        }
+
+        .selection-panel {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .preview-panel {
+            width: 400px;
+            flex-shrink: 0;
+        }
+
+        /* Dropdown Mode */
+        .instruction-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+
+        .instruction-box h3 {
+            font-size: 14px;
+            color: #2F5496;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .instruction-box p {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:hover {
+            border-color: #667eea;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        select:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        /* Checkbox Mode */
+        .checkbox-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .checkbox-item:hover {
+            background: #e8f0fe;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            margin: 0;
+            cursor: pointer;
+            font-size: 15px;
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 500;
+        }
+
+        /* Results Section */
+        .results-section {
+            margin-top: 25px;
+            padding: 25px;
+            background: linear-gradient(135deg, #70AD47 0%, #5a8c38 100%);
+            border-radius: 15px;
+            color: white;
+            display: none;
+        }
+
+        .results-section.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .results-section h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .result-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-label {
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .result-value {
+            font-size: 16px;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .result-value.grid-location {
+            font-size: 28px;
+            letter-spacing: 2px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .not-assigned {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* Preview Panel */
+        .preview-panel {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+        }
+
+        .preview-panel.show {
+            display: block;
+        }
+
+        .preview-panel h3 {
+            font-size: 14px;
+            color: #2F5496;
+            margin-bottom: 15px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .preview-image-container {
+            width: 100%;
+            height: 400px;
+            background: #e0e0e0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+
+        .preview-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preview-info {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .preview-grid {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2F5496;
+            margin-bottom: 8px;
+        }
+
+        .preview-materials {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Gallery View */
+        .gallery-container {
+            padding: 30px;
+        }
+
+        .gallery-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            align-items: center;
+        }
+
+        .gallery-filters select {
+            flex: 1;
+        }
+
+        .clear-filters-btn {
+            padding: 12px 24px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .clear-filters-btn:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .gallery-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .gallery-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+
+        .gallery-card-image {
+            width: 100%;
+            height: 200px;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .gallery-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-card-image .no-image {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .gallery-card-info {
+            padding: 15px;
+            text-align: center;
+        }
+
+        .gallery-card-grid {
+            font-size: 36px;
+            font-weight: 900;
+            color: #2F5496;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .gallery-card-materials {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.4;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .gallery-card-status {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #70AD47;
+            color: white;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(0,0,0,0.8);
+            transform: rotate(90deg);
+        }
+
+        .modal-image {
+            width: 100%;
+            display: block;
+        }
+
+        .modal-details {
+            padding: 30px;
+        }
+
+        .modal-grid {
+            font-size: 48px;
+            font-weight: 700;
+            color: #2F5496;
+            margin-bottom: 15px;
+        }
+
+        .modal-info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .modal-info-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .modal-info-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .modal-info-value {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .last-updated {
+            margin-top: 5px;
+            font-size: 11px;
+            color: #999;
+        }
+
+        .feedback-btn {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .feedback-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .feedback-btn::before {
+            content: '✉ ';
+            margin-right: 5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .content-wrapper {
+                flex-direction: column;
+            }
+
+            .preview-panel {
+                width: 100%;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+
+            .modal-content {
+                margin: 20px;
+                max-width: calc(100% - 40px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="live-indicator">Live Data</div>
+            <h1>Floor Transition Details</h1>
+            <p>Detail Grid Location Lookup System</p>
+        </div>
+
+        <div id="loadingSection" class="loading">
+            <div class="loading-spinner"></div>
+            <p>Loading data from Google Sheets...</p>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" data-tab="dropdown">Dropdown Mode</div>
+                <div class="tab" data-tab="checkbox">Checkbox Mode</div>
+                <div class="tab" data-tab="gallery">Gallery View</div>
+            </div>
+
+            <!-- Tab Content -->
+            <!-- Dropdown Mode -->
+            <div class="tab-content active" id="dropdown-content">
+                <div class="content-wrapper">
+                    <div class="selection-panel">
+                        <div class="instruction-box">
+                            <h3>How to Use</h3>
+                            <p>Select two floor materials from the dropdowns below. The preview will show on the right if available.</p>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="dropdown-mat1">Material 1</label>
+                            <select id="dropdown-mat1" disabled>
+                                <option value="">-- Loading... --</option>
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="dropdown-mat2">Material 2</label>
+                            <select id="dropdown-mat2" disabled>
+                                <option value="">-- Loading... --</option>
+                            </select>
+                        </div>
+
+                        <div class="results-section" id="dropdown-results"></div>
+                    </div>
+
+                    <div class="preview-panel" id="dropdown-preview">
+                        <h3>Preview</h3>
+                        <div class="preview-image-container" id="dropdown-preview-image">
+                            <span style="color: #999;">Select materials to preview</span>
+                        </div>
+                        <div class="preview-info" id="dropdown-preview-info"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Checkbox Mode -->
+            <div class="tab-content" id="checkbox-content">
+                <div class="content-wrapper">
+                    <div class="selection-panel">
+                        <div class="instruction-box">
+                            <h3>How to Use</h3>
+                            <p>Check a material from the first list, then check a paired material from the filtered second list.</p>
+                        </div>
+
+                        <label>Select Material 1:</label>
+                        <div class="checkbox-container" id="checkbox-mat1-container"></div>
+
+                        <label>Select Material 2:</label>
+                        <div class="checkbox-container" id="checkbox-mat2-container">
+                            <p style="color: #999; text-align: center;">Select Material 1 first</p>
+                        </div>
+
+                        <div class="results-section" id="checkbox-results"></div>
+                    </div>
+
+                    <div class="preview-panel" id="checkbox-preview">
+                        <h3>Preview</h3>
+                        <div class="preview-image-container" id="checkbox-preview-image">
+                            <span style="color: #999;">Select materials to preview</span>
+                        </div>
+                        <div class="preview-info" id="checkbox-preview-info"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gallery View -->
+            <div class="tab-content" id="gallery-content">
+                <div class="gallery-container">
+                    <div class="gallery-filters">
+                        <select id="gallery-filter-mat1">
+                            <option value="">All Materials (Filter 1)</option>
+                        </select>
+                        <select id="gallery-filter-mat2">
+                            <option value="">All Materials (Filter 2)</option>
+                        </select>
+                        <button class="clear-filters-btn" onclick="clearGalleryFilters()">Clear Filters</button>
+                    </div>
+                    <div class="gallery-grid" id="gallery-grid"></div>
+                </div>
+            </div>
+
+            <div class="footer">
+                Floor Transition Details &copy; 2024 | Barker/Nestor Inc.
+                <div class="last-updated" id="lastUpdated"></div>
+                <a href="/cdn-cgi/l/email-protection#a1c5c5c0d7c8c5e1c3c0d3cac4d3cfc4d2d5ced38fc2cecc9ed2d4c3cbc4c2d59cecc0d5c4d3c8c0cd81e7c8cfc5c4d381e7c4c4c5c3c0c2ca" class="feedback-btn">Send Feedback</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <img class="modal-image" id="modal-image" src="" alt="">
+            <div class="modal-details">
+                <div class="modal-grid" id="modal-grid"></div>
+                <div class="modal-info-grid" id="modal-info"></div>
+            </div>
+        </div>
+    </div>
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+        // Configuration
+        const SHEET_ID = '1v3zNXysqwsWYd15BCsYjSCG3vD6RzoERe7NWARgCIsE';
+        const DRIVE_FOLDER_ID = '1VdmFNPOws8EXGr_7nz-1TBzdHAPAG8bB';
+        
+        let materialData = {
+            materials: [],
+            pairs: []
+        };
+
+        let currentMode = 'dropdown';
+
+        // Get image URL from Google Drive using file ID from sheet data
+        // If no file ID in data, return null (shows placeholder)
+        function getImageUrl(pair) {
+            // Check if pair has image_file_id property (from new column in sheet)
+            if (pair.image_file_id && pair.image_file_id !== '') {
+                return `https://drive.google.com/uc?export=view&id=${pair.image_file_id}`;
+            }
+            return null;
+        }
+
+        // Load Google Sheets data
+        async function loadGoogleSheetData() {
+            try {
+                await loadSheet('Floor_Materials', parseMaterialsFromJSON);
+                await loadSheet('Material_Pairs', parsePairsFromJSON);
+                
+                document.getElementById('loadingSection').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                
+                initializeDropdownMode();
+                initializeCheckboxMode();
+                initializeGalleryView();
+                updateLastUpdated();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError('Unable to load data from Google Sheets.');
+            }
+        }
+
+        function loadSheet(sheetName, parseFunction) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'handleSheetData_' + Date.now();
+                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+                
+                window[callbackName] = function(data) {
+                    try {
+                        parseFunction(data);
+                        delete window[callbackName];
+                        document.body.removeChild(script);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                const script = document.createElement('script');
+                script.src = url.replace('tqx=out:json', `tqx=out:json;responseHandler:${callbackName}`);
+                script.onerror = () => reject(new Error(`Failed to load ${sheetName}`));
+                document.body.appendChild(script);
+            });
+        }
+
+        function parseMaterialsFromJSON(data) {
+            materialData.materials = [];
+            const rows = data.table.rows;
+            
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row.c) continue;
+                
+                const id = row.c[0] ? row.c[0].v : null;
+                const name = row.c[1] ? row.c[1].v : null;
+                const active = row.c[2] ? row.c[2].v : null;
+                
+                if (id && name && active && active.toString().toLowerCase() === 'yes') {
+                    materialData.materials.push({ id, name });
+                }
+            }
+            
+            materialData.materials.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        function parsePairsFromJSON(data) {
+            materialData.pairs = [];
+            const rows = data.table.rows;
+            
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row.c) continue;
+                
+                const mat_a_id = row.c[0] ? row.c[0].v : null;
+                const mat_a_name = row.c[1] ? row.c[1].v : null;
+                const mat_b_id = row.c[2] ? row.c[2].v : null;
+                const mat_b_name = row.c[3] ? row.c[3].v : null;
+                const pair_key = row.c[4] ? row.c[4].v : null;
+                const grid_location = row.c[5] ? row.c[5].v : null;
+                const status = row.c[6] ? row.c[6].v : 'Draft';
+                const notes = row.c[7] ? row.c[7].v : '';
+                const image_file_id = row.c[8] ? row.c[8].v : ''; // NEW: Column I for image file ID
+                
+                if (mat_a_id && mat_b_id && pair_key) {
+                    materialData.pairs.push({
+                        mat_a_id,
+                        mat_a_name,
+                        mat_b_id,
+                        mat_b_name,
+                        pair_key,
+                        grid_location: grid_location || 'Not Assigned',
+                        status,
+                        notes,
+                        image_file_id
+                    });
+                }
+            }
+        }
+
+        // Tab switching
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGoogleSheetData();
+            
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+        });
+
+        function switchTab(tabName) {
+            currentMode = tabName;
+            
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(`${tabName}-content`).classList.add('active');
+        }
+
+        // Dropdown Mode
+        function initializeDropdownMode() {
+            const mat1 = document.getElementById('dropdown-mat1');
+            const mat2 = document.getElementById('dropdown-mat2');
+            
+            mat1.innerHTML = '<option value="">-- Select Material 1 --</option>';
+            mat2.innerHTML = '<option value="">-- Select Material 2 --</option>';
+            
+            materialData.materials.forEach(material => {
+                mat1.add(new Option(material.name, material.id));
+                mat2.add(new Option(material.name, material.id));
+            });
+            
+            mat1.disabled = false;
+            mat2.disabled = false;
+            
+            mat1.addEventListener('change', () => {
+                filterDropdownMat2();
+                updateDropdownResults();
+            });
+            
+            mat2.addEventListener('change', updateDropdownResults);
+        }
+
+        function filterDropdownMat2() {
+            const mat1Id = document.getElementById('dropdown-mat1').value;
+            const mat2 = document.getElementById('dropdown-mat2');
+            const currentValue = mat2.value;
+            
+            mat2.innerHTML = '<option value="">-- Select Material 2 --</option>';
+            
+            if (!mat1Id) {
+                materialData.materials.forEach(material => {
+                    mat2.add(new Option(material.name, material.id));
+                });
+            } else {
+                const pairedMaterialIds = new Set();
+                materialData.pairs.forEach(pair => {
+                    if (pair.mat_a_id === mat1Id) pairedMaterialIds.add(pair.mat_b_id);
+                    else if (pair.mat_b_id === mat1Id) pairedMaterialIds.add(pair.mat_a_id);
+                });
+                
+                materialData.materials.forEach(material => {
+                    if (pairedMaterialIds.has(material.id)) {
+                        mat2.add(new Option(material.name, material.id));
+                    }
+                });
+            }
+            
+            if (currentValue && Array.from(mat2.options).some(opt => opt.value === currentValue)) {
+                mat2.value = currentValue;
+            }
+        }
+
+        function updateDropdownResults() {
+            const mat1Id = document.getElementById('dropdown-mat1').value;
+            const mat2Id = document.getElementById('dropdown-mat2').value;
+            
+            if (!mat1Id || !mat2Id) {
+                document.getElementById('dropdown-results').classList.remove('show');
+                document.getElementById('dropdown-preview').classList.remove('show');
+                return;
+            }
+
+            const normalizedKey = [mat1Id, mat2Id].sort().join('–');
+            const pair = materialData.pairs.find(p => p.pair_key === normalizedKey);
+            
+            if (pair && pair.grid_location !== 'Not Assigned') {
+                showResults('dropdown-results', pair);
+                showPreview('dropdown-preview', 'dropdown-preview-image', 'dropdown-preview-info', pair);
+            } else {
+                document.getElementById('dropdown-results').innerHTML = '<div class="not-assigned">⚠ This pairing has not been assigned yet.</div>';
+                document.getElementById('dropdown-results').classList.add('show');
+                document.getElementById('dropdown-preview').classList.remove('show');
+            }
+        }
+
+        // Checkbox Mode
+        function initializeCheckboxMode() {
+            const container1 = document.getElementById('checkbox-mat1-container');
+            container1.innerHTML = '';
+            
+            materialData.materials.forEach(material => {
+                const item = document.createElement('div');
+                item.className = 'checkbox-item';
+                item.innerHTML = `
+                    <input type="checkbox" id="cb1-${material.id}" value="${material.id}" name="checkbox-mat1">
+                    <label for="cb1-${material.id}">${material.name}</label>
+                `;
+                item.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'INPUT') {
+                        const checkbox = item.querySelector('input');
+                        checkbox.checked = !checkbox.checked;
+                    }
+                    handleCheckboxMat1Change();
+                });
+                container1.appendChild(item);
+            });
+        }
+
+        function handleCheckboxMat1Change() {
+            // Uncheck all mat1 checkboxes except the one clicked
+            const checkboxes = document.querySelectorAll('input[name="checkbox-mat1"]');
+            let selectedId = null;
+            
+            checkboxes.forEach(cb => {
+                if (cb.checked && selectedId === null) {
+                    selectedId = cb.value;
+                } else {
+                    cb.checked = false;
+                }
+            });
+            
+            const container2 = document.getElementById('checkbox-mat2-container');
+            container2.innerHTML = '';
+            
+            // Uncheck mat2
+            document.querySelectorAll('input[name="checkbox-mat2"]').forEach(cb => cb.checked = false);
+            
+            if (!selectedId) {
+                container2.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Select Material 1 first</p>';
+                document.getElementById('checkbox-results').classList.remove('show');
+                document.getElementById('checkbox-preview').classList.remove('show');
+                return;
+            }
+            
+            // Find paired materials
+            const pairedMaterialIds = new Set();
+            materialData.pairs.forEach(pair => {
+                if (pair.mat_a_id === selectedId) pairedMaterialIds.add(pair.mat_b_id);
+                else if (pair.mat_b_id === selectedId) pairedMaterialIds.add(pair.mat_a_id);
+            });
+            
+            // Populate mat2 with only paired materials
+            materialData.materials.forEach(material => {
+                if (pairedMaterialIds.has(material.id)) {
+                    const item = document.createElement('div');
+                    item.className = 'checkbox-item';
+                    item.innerHTML = `
+                        <input type="checkbox" id="cb2-${material.id}" value="${material.id}" name="checkbox-mat2">
+                        <label for="cb2-${material.id}">${material.name}</label>
+                    `;
+                    item.addEventListener('click', (e) => {
+                        if (e.target.tagName !== 'INPUT') {
+                            const checkbox = item.querySelector('input');
+                            checkbox.checked = !checkbox.checked;
+                        }
+                        handleCheckboxMat2Change();
+                    });
+                    container2.appendChild(item);
+                }
+            });
+        }
+
+        function handleCheckboxMat2Change() {
+            // Single selection for mat2
+            const checkboxes = document.querySelectorAll('input[name="checkbox-mat2"]');
+            let selectedId = null;
+            
+            checkboxes.forEach(cb => {
+                if (cb.checked && selectedId === null) {
+                    selectedId = cb.value;
+                } else {
+                    cb.checked = false;
+                }
+            });
+            
+            if (!selectedId) {
+                document.getElementById('checkbox-results').classList.remove('show');
+                document.getElementById('checkbox-preview').classList.remove('show');
+                return;
+            }
+            
+            const mat1Id = document.querySelector('input[name="checkbox-mat1"]:checked')?.value;
+            if (!mat1Id) return;
+            
+            const normalizedKey = [mat1Id, selectedId].sort().join('–');
+            const pair = materialData.pairs.find(p => p.pair_key === normalizedKey);
+            
+            if (pair && pair.grid_location !== 'Not Assigned') {
+                showResults('checkbox-results', pair);
+                showPreview('checkbox-preview', 'checkbox-preview-image', 'checkbox-preview-info', pair);
+            }
+        }
+
+        // Gallery View
+        function initializeGalleryView() {
+            const filter1 = document.getElementById('gallery-filter-mat1');
+            const filter2 = document.getElementById('gallery-filter-mat2');
+            
+            materialData.materials.forEach(material => {
+                filter1.add(new Option(material.name, material.id));
+                filter2.add(new Option(material.name, material.id));
+            });
+            
+            filter1.addEventListener('change', filterGallery);
+            filter2.addEventListener('change', filterGallery);
+            
+            renderGallery();
+        }
+
+        function filterGallery() {
+            const mat1 = document.getElementById('gallery-filter-mat1').value;
+            const mat2 = document.getElementById('gallery-filter-mat2').value;
+            
+            let filtered = materialData.pairs;
+            
+            if (mat1 && mat2) {
+                const normalizedKey = [mat1, mat2].sort().join('–');
+                filtered = filtered.filter(p => p.pair_key === normalizedKey);
+            } else if (mat1) {
+                filtered = filtered.filter(p => p.mat_a_id === mat1 || p.mat_b_id === mat1);
+            } else if (mat2) {
+                filtered = filtered.filter(p => p.mat_a_id === mat2 || p.mat_b_id === mat2);
+            }
+            
+            renderGallery(filtered);
+        }
+
+        function clearGalleryFilters() {
+            document.getElementById('gallery-filter-mat1').value = '';
+            document.getElementById('gallery-filter-mat2').value = '';
+            renderGallery();
+        }
+
+        function renderGallery(pairs = materialData.pairs) {
+            const grid = document.getElementById('gallery-grid');
+            grid.innerHTML = '';
+            
+            pairs.forEach(pair => {
+                if (pair.grid_location === 'Not Assigned') return;
+                
+                const card = document.createElement('div');
+                card.className = 'gallery-card';
+                card.onclick = () => openModal(pair);
+                
+                const imageUrl = getImageUrl(pair);
+                const imageHtml = imageUrl 
+                    ? `<img src="${imageUrl}" alt="${pair.grid_location}" onerror="this.parentElement.innerHTML='<span class=\\'no-image\\'>No image</span>'">`
+                    : '<span class="no-image">No image</span>';
+                
+                card.innerHTML = `
+                    <div class="gallery-card-image">${imageHtml}</div>
+                    <div class="gallery-card-info">
+                        <div class="gallery-card-grid">${pair.grid_location}</div>
+                        <div class="gallery-card-materials">
+                            ${pair.mat_a_name}<br>+ ${pair.mat_b_name}
+                        </div>
+                        <div class="gallery-card-status">${pair.status}</div>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        // Show results
+        function showResults(containerId, pair) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `
+                <h2>Results</h2>
+                <div class="result-item">
+                    <span class="result-label">Grid Location</span>
+                    <span class="result-value grid-location">${pair.grid_location}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Pair Key</span>
+                    <span class="result-value">${pair.pair_key}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Status</span>
+                    <span class="result-value"><span class="status-badge">${pair.status}</span></span>
+                </div>
+                ${pair.notes && pair.notes.trim() ? `
+                <div class="result-item" style="flex-direction: column; align-items: flex-start;">
+                    <span class="result-label" style="margin-bottom: 8px;">Notes</span>
+                    <span class="result-value" style="font-size: 13px; line-height: 1.4; text-align: left; font-weight: 400;">${pair.notes}</span>
+                </div>
+                ` : ''}
+            `;
+            container.classList.add('show');
+        }
+
+        // Show preview
+        function showPreview(panelId, imageId, infoId, pair) {
+            const panel = document.getElementById(panelId);
+            const imageContainer = document.getElementById(imageId);
+            const info = document.getElementById(infoId);
+            
+            const imageUrl = getImageUrl(pair);
+            
+            if (imageUrl) {
+                imageContainer.innerHTML = `<img src="${imageUrl}" alt="${pair.grid_location}" onclick="openModal(${JSON.stringify(pair).replace(/"/g, '&quot;')})" onerror="this.parentElement.innerHTML='<span style=\\'color:#999\\'>Image not available</span>'">`;
+                
+                info.innerHTML = `
+                    <div class="preview-grid">${pair.grid_location}</div>
+                    <div class="preview-materials">${pair.mat_a_name} + ${pair.mat_b_name}</div>
+                `;
+                
+                panel.classList.add('show');
+            } else {
+                panel.classList.remove('show');
+            }
+        }
+
+        // Modal
+        function openModal(pair) {
+            const modal = document.getElementById('detailModal');
+            const modalImage = document.getElementById('modal-image');
+            const modalGrid = document.getElementById('modal-grid');
+            const modalInfo = document.getElementById('modal-info');
+            
+            const imageUrl = getImageUrl(pair);
+            modalImage.src = imageUrl || '';
+            modalImage.style.display = imageUrl ? 'block' : 'none';
+            
+            modalGrid.textContent = pair.grid_location;
+            
+            modalInfo.innerHTML = `
+                <div class="modal-info-item">
+                    <div class="modal-info-label">Material 1</div>
+                    <div class="modal-info-value">${pair.mat_a_name}</div>
+                </div>
+                <div class="modal-info-item">
+                    <div class="modal-info-label">Material 2</div>
+                    <div class="modal-info-value">${pair.mat_b_name}</div>
+                </div>
+                <div class="modal-info-item">
+                    <div class="modal-info-label">Pair Key</div>
+                    <div class="modal-info-value">${pair.pair_key}</div>
+                </div>
+                <div class="modal-info-item">
+                    <div class="modal-info-label">Status</div>
+                    <div class="modal-info-value">${pair.status}</div>
+                </div>
+                ${pair.notes && pair.notes.trim() ? `
+                <div class="modal-info-item" style="grid-column: 1 / -1;">
+                    <div class="modal-info-label">Notes</div>
+                    <div class="modal-info-value" style="font-weight: 400;">${pair.notes}</div>
+                </div>
+                ` : ''}
+            `;
+            
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('show');
+        }
+
+        // Click outside modal to close
+        document.getElementById('detailModal').addEventListener('click', (e) => {
+            if (e.target.id === 'detailModal') {
+                closeModal();
+            }
+        });
+
+        // Utility
+        function showError(message) {
+            document.getElementById('loadingSection').innerHTML = `
+                <div style="color: #c33; padding: 40px; text-align: center;">
+                    <strong>Error:</strong> ${message}
+                    <br><br>
+                    <button onclick="location.reload()" style="padding: 10px 20px; background: #c33; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        Retry
+                    </button>
+                </div>
+            `;
+        }
+
+        function updateLastUpdated() {
+            const now = new Date();
+            const formatted = now.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-
