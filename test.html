@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test</title>
+</head>
+<body>
+    <h1>GitHub Pages Test</h1>
+    <div id="output">Loading...</div>
+    
+    <script>
+        console.log('=== SCRIPT IS RUNNING ===');
+        document.getElementById('output').textContent = 'JavaScript is working!';
+        
+        // Test Google Sheets access
+        const SHEET_ID = '1v3zNXysqwsWYd15BCsYjSCG3vD6RzoERe7NWARgCIsE';
+        const url = `https://docs.google.com/spreadsheets/d/1v3zNXysqwsWYd15BCsYjSCG3vD6RzoERe7NWARgCIsE/gviz/tq?tqx=out:json&sheet=Floor_Materials`;
+        
+        console.log('Testing URL:', url);
+        
+        const callbackName = 'testCallback';
+        window[callbackName] = function(data) {
+            console.log('SUCCESS! Received data:', data);
+            document.getElementById('output').textContent = 'SUCCESS! Google Sheets connection works!';
+        };
+        
+        const script = document.createElement('script');
+        script.src = url.replace('tqx=out:json', `tqx=out:json;responseHandler:${callbackName}`);
+        script.onerror = function() {
+            console.error('FAILED to load Google Sheets');
+            document.getElementById('output').textContent = 'FAILED to connect to Google Sheets';
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
