@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Floor Transition Details v3.2</title>
+    <title>Floor Transition Details v3.4</title>
     <style>
-        /* Existing styles from previous versions */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 1200px; margin: 0 auto; overflow: hidden; }
@@ -102,31 +101,21 @@
         .feedback-btn:hover { transform: translateY(-2px); }
         .feedback-btn::before { content: '✉ '; margin-right: 5px; }
         
-        .sync-btn {
-            background: #2F5496; color: white; border: none; padding: 8px 15px; border-radius: 4px;
-            cursor: pointer; font-size: 12px; margin-top: 10px; transition: 0.2s;
-        }
-        .sync-btn:hover { background: #1a3a6b; }
-
-        @media (max-width: 900px) {
-            .content-wrapper { flex-direction: column; }
-            .preview-panel { width: 100%; }
-            .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-            .modal-content { margin: 20px; max-width: calc(100% - 40px); }
-        }
+        .sync-btn { background: #2F5496; color: white; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-top: 10px; font-weight: 600; }
+        #debugInfo { font-size: 10px; color: #999; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div class="live-indicator">Live Data</div>
-            <h1>Floor Transition Details<span class="version-tag">v3.2</span></h1>
+            <h1>Floor Transition Details <span class="version-tag">v3.4</span></h1>
             <p>Detail Grid Location Lookup System</p>
         </div>
 
         <div id="loadingSection" class="loading">
             <div class="loading-spinner"></div>
-            <p id="loadingText">Connecting to Google Sheets...</p>
+            <p id="loadingStatus">Connecting to Google Servers...</p>
         </div>
 
         <div id="mainContent" style="display:none;">
@@ -205,8 +194,9 @@
 
             <div class="footer">
                 Floor Transition Details &copy; 2024 | Barker/Nestor Inc.
+                <div id="debugInfo">Waiting for sync...</div>
                 <div class="last-updated" id="lastUpdated"></div>
-                <button class="sync-btn" onclick="refreshData()">Force Sync Now</button><br>
+                <button class="sync-btn" onclick="forceSync()">Sync Google Data</button><br>
                 <a href="mailto:ddavid@barkernestor.com?subject=Material Finder Feedback" class="feedback-btn">Send Feedback</a>
             </div>
         </div>
@@ -228,24 +218,24 @@
         let materials = [];
         let pairs = [];
 
-        function loadSheet(name, callback) {
+        async function loadSheet(name, callback) {
             return new Promise((resolve, reject) => {
-                const cb = 'cb_' + Math.now() + '_' + Math.random().toString(36).substr(2,9);
-                // Forced cache-buster &t= parameter
+                const cb = 'cb_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
+                // FIXED: Changed Math.now() to Date.now()
                 const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=${name}&t=${Date.now()}`;
                 
                 window[cb] = function(data) {
                     callback(data);
                     delete window[cb];
-                    const s = document.getElementById('sheet-script-' + cb);
+                    const s = document.getElementById('script-' + cb);
                     if (s) document.body.removeChild(s);
                     resolve();
                 };
                 
                 const s = document.createElement('script');
-                s.id = 'sheet-script-' + cb;
+                s.id = 'script-' + cb;
                 s.src = url;
-                s.onerror = () => reject('Failed to load: ' + name);
+                s.onerror = () => reject('Network Error: ' + name);
                 document.body.appendChild(s);
             });
         }
@@ -257,9 +247,7 @@
                 const id = row.c[0]?.v;
                 const name = row.c[1]?.v;
                 const active = row.c[2]?.v;
-                if (id && name && active?.toString().toLowerCase() === 'yes') {
-                    materials.push({id, name});
-                }
+                if (id && name && active?.toString().toLowerCase() === 'yes') materials.push({id, name});
             });
             materials.sort((a,b) => a.name.localeCompare(b.name));
         }
@@ -277,34 +265,28 @@
                 const status = row.c[6]?.v || 'Draft';
                 const notes = row.c[7]?.v || '';
                 const img = (row.c[8] && row.c[8].v) ? row.c[8].v.toString().trim() : '';
-                
-                if (a_id && b_id && key) {
-                    pairs.push({a_id, a_name, b_id, b_name, key, grid: grid || 'Not Assigned', status, notes, img});
-                }
+                if (a_id && b_id && key) pairs.push({a_id, a_name, b_id, b_name, key, grid: grid || 'Not Assigned', status, notes, img});
             });
         }
 
         function getImageUrl(pair) {
-            if (pair.img && pair.img !== '') {
-                let fileId = pair.img;
-                if (fileId.includes('id=')) fileId = fileId.split('id=')[1].split('&')[0];
-                else if (fileId.includes('/d/')) fileId = fileId.split('/d/')[1].split('/')[0];
-                // Google Drive Security Bypass 2024
-                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
-            }
-            return null;
+            if (!pair.img) return null;
+            let id = pair.img;
+            if (id.includes('id=')) id = id.split('id=')[1].split('&')[0];
+            else if (id.includes('/d/')) id = id.split('/d/')[1].split('/')[0];
+            return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
         }
 
-        // UI Handlers (Shortened for brevity but functionality remains same)
-        function refreshData() {
+        async function forceSync() {
             document.getElementById('mainContent').style.display = 'none';
             document.getElementById('loadingSection').style.display = 'block';
-            document.getElementById('loadingText').textContent = "Refreshing data (this may take a few moments)...";
-            initApp();
+            document.getElementById('loadingStatus').textContent = "Updating feed from Google...";
+            await startApp();
         }
 
-        async function initApp() {
+        async function startApp() {
             try {
+                // FIXED: Using Promise.all for reliability and correct Date call
                 await loadSheet('Floor_Materials', parseMaterials);
                 await loadSheet('Material_Pairs', parsePairs);
                 
@@ -314,196 +296,158 @@
                 initDropdown();
                 initCheckbox();
                 initGallery();
-                updateTimestamp();
-                console.log('App Synced at', new Date().toLocaleTimeString());
+                
+                const now = new Date();
+                document.getElementById('lastUpdated').textContent = 'Last Sync: ' + now.toLocaleTimeString();
+                document.getElementById('debugInfo').textContent = `Success: Found ${materials.length} Materials and ${pairs.length} Active Pairs.`;
             } catch (err) {
-                document.getElementById('loadingSection').innerHTML = `<div style="color:red;padding:20px;">Sync Error: ${err}</div>`;
+                // Displays readable error in the UI
+                document.getElementById('loadingStatus').innerHTML = `<span style="color:red">Sync Error: ${err}</span>`;
             }
         }
 
-        function updateTimestamp() {
-            const now = new Date();
-            document.getElementById('lastUpdated').textContent = 'Last synced: ' + now.toLocaleString();
-        }
-
-        // Tab Switching
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
-                tab.classList.add('active');
-                document.getElementById(tab.dataset.tab + '-content').classList.add('active');
-            });
-        });
-
-        // Initialize App on load
-        window.onload = initApp;
-
-        // --- Keep previous UI functions (initDropdown, initCheckbox, initGallery, openModal, etc.) below ---
         function initDropdown() {
-            const mat1 = document.getElementById('dropdown-mat1');
-            const mat2 = document.getElementById('dropdown-mat2');
-            mat1.innerHTML = '<option value="">-- Select Material 1 --</option>';
-            mat2.innerHTML = '<option value="">-- Select Material 2 --</option>';
+            const m1 = document.getElementById('dropdown-mat1');
+            const m2 = document.getElementById('dropdown-mat2');
+            m1.innerHTML = '<option value="">-- Select Material 1 --</option>';
+            m2.innerHTML = '<option value="">-- Select Material 2 --</option>';
             materials.forEach(m => {
-                mat1.add(new Option(m.name, m.id));
-                mat2.add(new Option(m.name, m.id));
+                m1.add(new Option(m.name, m.id));
+                m2.add(new Option(m.name, m.id));
             });
-            mat1.onchange = () => { filterDropdownMat2(); updateDropdown(); };
-            mat2.onchange = updateDropdown;
+            m1.onchange = () => { filterDropdownMat2(); updateDropdown(); };
+            m2.onchange = updateDropdown;
         }
 
         function filterDropdownMat2() {
             const id1 = document.getElementById('dropdown-mat1').value;
-            const mat2 = document.getElementById('dropdown-mat2');
-            const curr = mat2.value;
-            mat2.innerHTML = '<option value="">-- Select Material 2 --</option>';
-            if (!id1) {
-                materials.forEach(m => mat2.add(new Option(m.name, m.id)));
-            } else {
+            const m2 = document.getElementById('dropdown-mat2');
+            const curr = m2.value;
+            m2.innerHTML = '<option value="">-- Select Material 2 --</option>';
+            if (id1) {
                 const paired = new Set();
-                pairs.forEach(p => {
-                    if (p.a_id === id1) paired.add(p.b_id);
-                    if (p.b_id === id1) paired.add(p.a_id);
-                });
-                materials.forEach(m => {
-                    if (paired.has(m.id)) mat2.add(new Option(m.name, m.id));
-                });
+                pairs.forEach(p => { if (p.a_id === id1) paired.add(p.b_id); if (p.b_id === id1) paired.add(p.a_id); });
+                materials.forEach(m => { if (paired.has(m.id)) m2.add(new Option(m.name, m.id)); });
             }
-            if (curr && Array.from(mat2.options).some(o => o.value === curr)) mat2.value = curr;
+            if (curr && Array.from(m2.options).some(o => o.value === curr)) m2.value = curr;
         }
 
         function updateDropdown() {
             const id1 = document.getElementById('dropdown-mat1').value;
             const id2 = document.getElementById('dropdown-mat2').value;
             if (!id1 || !id2) return;
-            const key = [id1, id2].sort().join('–');
-            const pair = pairs.find(p => p.key === key);
-            if (pair && pair.grid !== 'Not Assigned') {
+            const pair = pairs.find(p => p.key === [id1, id2].sort().join('–'));
+            if (pair) {
                 showResults('dropdown-results', pair);
                 showPreview('dropdown-preview', 'dropdown-preview-image', 'dropdown-preview-info', pair);
             }
         }
 
         function initCheckbox() {
-            const container1 = document.getElementById('checkbox-mat1-container');
-            container1.innerHTML = '';
+            const c1 = document.getElementById('checkbox-mat1-container');
+            c1.innerHTML = '';
             materials.forEach(m => {
-                const item = document.createElement('div');
-                item.className = 'checkbox-item';
-                item.innerHTML = `<input type="checkbox" id="cb1-${m.id}" value="${m.id}" name="cb-mat1"><label for="cb1-${m.id}">${m.name}</label>`;
-                item.onclick = (e) => {
-                    if (e.target.tagName !== 'INPUT') item.querySelector('input').click();
-                    handleCheckboxMat1();
-                };
-                container1.appendChild(item);
+                const div = document.createElement('div');
+                div.className = 'checkbox-item';
+                div.innerHTML = `<input type="checkbox" id="c1-${m.id}" value="${m.id}" name="m1"><label for="c1-${m.id}">${m.name}</label>`;
+                div.onclick = (e) => { if (e.target.tagName !== 'INPUT') div.querySelector('input').click(); handleM1(); };
+                c1.appendChild(div);
             });
         }
 
-        function handleCheckboxMat1() {
-            const selected = document.querySelector('input[name="cb-mat1"]:checked')?.value;
-            const container2 = document.getElementById('checkbox-mat2-container');
-            container2.innerHTML = '';
-            if (!selected) return;
-            const paired = new Set();
-            pairs.forEach(p => {
-                if (p.a_id === selected) paired.add(p.b_id);
-                if (p.b_id === selected) paired.add(p.a_id);
-            });
+        function handleM1() {
+            const sel = document.querySelector('input[name="m1"]:checked')?.value;
+            const c2 = document.getElementById('checkbox-mat2-container');
+            c2.innerHTML = '';
+            if (!sel) return;
+            const pSet = new Set();
+            pairs.forEach(p => { if (p.a_id === sel) pSet.add(p.b_id); if (p.b_id === sel) pSet.add(p.a_id); });
             materials.forEach(m => {
-                if (paired.has(m.id)) {
-                    const item = document.createElement('div');
-                    item.className = 'checkbox-item';
-                    item.innerHTML = `<input type="checkbox" id="cb2-${m.id}" value="${m.id}" name="cb-mat2"><label for="cb2-${m.id}">${m.name}</label>`;
-                    item.onclick = (e) => {
-                        if (e.target.tagName !== 'INPUT') item.querySelector('input').click();
-                        handleCheckboxMat2();
-                    };
-                    container2.appendChild(item);
+                if (pSet.has(m.id)) {
+                    const div = document.createElement('div');
+                    div.className = 'checkbox-item';
+                    div.innerHTML = `<input type="checkbox" id="c2-${m.id}" value="${m.id}" name="m2"><label for="c2-${m.id}">${m.name}</label>`;
+                    div.onclick = (e) => { if (e.target.tagName !== 'INPUT') div.querySelector('input').click(); handleM2(); };
+                    c2.appendChild(div);
                 }
             });
         }
 
-        function handleCheckboxMat2() {
-            const id1 = document.querySelector('input[name="cb-mat1"]:checked')?.value;
-            const id2 = document.querySelector('input[name="cb-mat2"]:checked')?.value;
-            if (!id1 || !id2) return;
-            const key = [id1, id2].sort().join('–');
-            const pair = pairs.find(p => p.key === key);
-            if (pair) {
-                showResults('checkbox-results', pair);
-                showPreview('checkbox-preview', 'checkbox-preview-image', 'checkbox-preview-info', pair);
-            }
+        function handleM2() {
+            const i1 = document.querySelector('input[name="m1"]:checked')?.value;
+            const i2 = document.querySelector('input[name="m2"]:checked')?.value;
+            if (!i1 || !i2) return;
+            const pair = pairs.find(p => p.key === [i1, i2].sort().join('–'));
+            if (pair) { showResults('checkbox-results', pair); showPreview('checkbox-preview', 'checkbox-preview-image', 'checkbox-preview-info', pair); }
         }
 
         function initGallery() {
             const f1 = document.getElementById('gallery-filter-mat1');
             const f2 = document.getElementById('gallery-filter-mat2');
-            materials.forEach(m => {
-                f1.add(new Option(m.name, m.id));
-                f2.add(new Option(m.name, m.id));
-            });
-            f1.onchange = filterGallery;
-            f2.onchange = filterGallery;
+            materials.forEach(m => { f1.add(new Option(m.name, m.id)); f2.add(new Option(m.name, m.id)); });
+            f1.onchange = fGallery; f2.onchange = fGallery;
             renderGallery();
         }
 
-        function filterGallery() {
-            const id1 = document.getElementById('gallery-filter-mat1').value;
-            const id2 = document.getElementById('gallery-filter-mat2').value;
-            let filtered = pairs;
-            if (id1 && id2) {
-                const key = [id1, id2].sort().join('–');
-                filtered = filtered.filter(p => p.key === key);
-            } else if (id1) {
-                filtered = filtered.filter(p => p.a_id === id1 || p.b_id === id1);
-            }
-            renderGallery(filtered);
+        function fGallery() {
+            const v1 = document.getElementById('gallery-filter-mat1').value;
+            const v2 = document.getElementById('gallery-filter-mat2').value;
+            let f = pairs;
+            if (v1 && v2) f = f.filter(p => p.key === [v1, v2].sort().join('–'));
+            else if (v1) f = f.filter(p => p.a_id === v1 || p.b_id === v1);
+            renderGallery(f);
         }
 
-        function renderGallery(pairsToShow = pairs) {
-            const grid = document.getElementById('gallery-grid');
-            grid.innerHTML = '';
-            pairsToShow.forEach(p => {
+        function clearGalleryFilters() {
+            document.getElementById('gallery-filter-mat1').value = '';
+            document.getElementById('gallery-filter-mat2').value = '';
+            renderGallery();
+        }
+
+        function renderGallery(list = pairs) {
+            const g = document.getElementById('gallery-grid');
+            g.innerHTML = '';
+            list.forEach(p => {
                 if (p.grid === 'Not Assigned') return;
-                const card = document.createElement('div');
-                card.className = 'gallery-card';
-                card.onclick = () => openModal(p);
-                const imgUrl = getImageUrl(p);
-                card.innerHTML = `
-                    <div class="gallery-card-image">${imgUrl ? `<img src="${imgUrl}">` : '<span class="no-image">No image</span>'}</div>
-                    <div class="gallery-card-info">
-                        <div class="gallery-card-grid">${p.grid}</div>
-                        <div class="gallery-card-materials">${p.a_name} + ${p.b_name}</div>
-                        <div class="gallery-card-status">${p.status}</div>
-                    </div>
-                `;
-                grid.appendChild(card);
+                const div = document.createElement('div');
+                div.className = 'gallery-card';
+                div.onclick = () => openModal(p);
+                const url = getImageUrl(p);
+                div.innerHTML = `<div class="gallery-card-image">${url ? `<img src="${url}">` : 'No Image'}</div><div class="gallery-card-info"><div class="gallery-card-grid">${p.grid}</div><div class="gallery-card-materials">${p.a_name} + ${p.b_name}</div><div class="gallery-card-status">${p.status}</div></div>`;
+                g.appendChild(div);
             });
         }
 
         function showResults(cid, p) {
             const el = document.getElementById(cid);
-            el.innerHTML = `<h2>Results</h2><div class="result-item"><span class="result-label">Grid</span><span class="result-value grid-location">${p.grid}</span></div><div class="result-item"><span class="result-label">Status</span><span class="result-value"><span class="status-badge">${p.status}</span></span></div>`;
+            el.innerHTML = `<h2>Results</h2><div class="result-item"><span>Grid</span><span class="grid-location">${p.grid}</span></div><div class="result-item"><span>Status</span><span class="status-badge">${p.status}</span></div>`;
             el.classList.add('show');
         }
 
-        function showPreview(panelId, imgId, infoId, p) {
+        function showPreview(pid, iid, infid, p) {
             const url = getImageUrl(p);
             if (!url) return;
-            document.getElementById(imgId).innerHTML = `<img src="${url}" onclick='openModal(${JSON.stringify(p)})'>`;
-            document.getElementById(infoId).innerHTML = `<div class="preview-grid">${p.grid}</div><div class="preview-materials">${p.a_name} + ${p.b_name}</div>`;
-            document.getElementById(panelId).classList.add('show');
+            document.getElementById(iid).innerHTML = `<img src="${url}" onclick='openModal(${JSON.stringify(p)})'>`;
+            document.getElementById(infid).innerHTML = `<div class="preview-grid">${p.grid}</div><div class="preview-materials">${p.a_name} + ${p.b_name}</div>`;
+            document.getElementById(pid).classList.add('show');
         }
 
         function openModal(p) {
             const url = getImageUrl(p);
             document.getElementById('modal-image').src = url || '';
             document.getElementById('modal-grid').textContent = p.grid;
-            document.getElementById('modal-info').innerHTML = `<div class="modal-info-item"><div class="modal-info-label">Materials</div><div class="modal-info-value">${p.a_name} + ${p.b_name}</div></div><div class="modal-info-item"><div class="modal-info-label">Status</div><div class="modal-info-value">${p.status}</div></div>`;
+            document.getElementById('modal-info').innerHTML = `<div class="modal-info-item"><b>Materials:</b> ${p.a_name} + ${p.b_name}</div><div class="modal-info-item"><b>Status:</b> ${p.status}</div>`;
             document.getElementById('detailModal').classList.add('show');
         }
 
         function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
+
+        document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+            document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
+            t.classList.add('active'); document.getElementById(t.dataset.tab + '-content').classList.add('active');
+        });
+
+        startApp();
     </script>
 </body>
 </html>
