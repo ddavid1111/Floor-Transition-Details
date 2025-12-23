@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Floor Transition Details</title>
+    <title>Floor Transition Details v3.1</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 1200px; margin: 0 auto; overflow: hidden; }
         .header { background: linear-gradient(135deg, #2F5496 0%, #1a3a6b 100%); color: white; padding: 30px; text-align: center; position: relative; }
-        .header h1 { font-size: 28px; margin-bottom: 5px; font-weight: 600; }
+        .header h1 { font-size: 28px; margin-bottom: 5px; font-weight: 600; display: inline-block; }
+        .version-tag { font-size: 12px; vertical-align: super; opacity: 0.7; margin-left: 8px; font-weight: 400; }
         .header p { font-size: 14px; opacity: 0.9; }
         .live-indicator { position: absolute; top: 15px; right: 15px; background: rgba(76,175,80,0.2); color: #4CAF50; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; }
         
@@ -112,7 +113,7 @@
     <div class="container">
         <div class="header">
             <div class="live-indicator">Live Data</div>
-            <h1>Floor Transition Details</h1>
+            <h1>Floor Transition Details<span class="version-tag">v3.1</span></h1>
             <p>Detail Grid Location Lookup System</p>
         </div>
 
@@ -224,17 +225,21 @@
         function loadSheet(name, callback) {
             return new Promise((resolve, reject) => {
                 const cb = 'cb_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
-                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=${name}`;
+                
+                // Added Cache Buster (&t=) to force browser to ignore cache
+                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=${name}&t=${Date.now()}`;
                 
                 window[cb] = function(data) {
                     console.log('✓ Loaded:', name);
                     callback(data);
                     delete window[cb];
-                    document.body.removeChild(s);
+                    const scriptTag = document.getElementById('sheet-script-' + cb);
+                    if (scriptTag) document.body.removeChild(scriptTag);
                     resolve();
                 };
                 
                 const s = document.createElement('script');
+                s.id = 'sheet-script-' + cb;
                 s.src = url;
                 s.onerror = () => reject('Failed: ' + name);
                 document.body.appendChild(s);
@@ -253,7 +258,6 @@
                 }
             });
             materials.sort((a,b) => a.name.localeCompare(b.name));
-            console.log('Materials:', materials.length);
         }
 
         function parsePairs(data) {
@@ -274,23 +278,19 @@
                     pairs.push({a_id, a_name, b_id, b_name, key, grid: grid || 'Not Assigned', status, notes, img});
                 }
             });
-            console.log('Pairs:', pairs.length);
+            console.log('Pairs Updated:', pairs.length);
         }
 
-        /**
-         * UPDATED: Using the Thumbnail endpoint to bypass 2024 Google Drive security blocks.
-         */
         function getImageUrl(pair) {
             if (pair.img && pair.img !== '') {
-                // If the user accidentally pasted a full URL instead of just the ID, try to extract ID
                 let fileId = pair.img;
+                // Extraction logic in case full links are used
                 if (fileId.includes('id=')) {
                     fileId = fileId.split('id=')[1].split('&')[0];
                 } else if (fileId.includes('/d/')) {
                     fileId = fileId.split('/d/')[1].split('/')[0];
                 }
-                
-                // Return high-quality 1000px wide preview thumbnail
+                // High-quality preview thumbnail endpoint
                 return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
             }
             return null;
@@ -526,7 +526,6 @@
             const info = document.getElementById(infoId);
             const imgUrl = getImageUrl(pair);
             if (imgUrl) {
-                // Ensure pair object is safe for stringification in the onclick handler
                 const safePair = JSON.stringify(pair).replace(/'/g, "\\'");
                 imageContainer.innerHTML = `<img src="${imgUrl}" alt="${pair.grid}" onclick='openModal(${safePair})' onerror="this.parentElement.innerHTML='<span style=\\'color:#999\\'>Image not available</span>'">`;
                 info.innerHTML = `<div class="preview-grid">${pair.grid}</div><div class="preview-materials">${pair.a_name} + ${pair.b_name}</div>`;
@@ -567,7 +566,7 @@
 
         function updateTimestamp() {
             const now = new Date();
-            document.getElementById('lastUpdated').textContent = 'Last loaded: ' + now.toLocaleString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});
+            document.getElementById('lastUpdated').textContent = 'Last synced: ' + now.toLocaleString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true});
         }
 
         Promise.all([
